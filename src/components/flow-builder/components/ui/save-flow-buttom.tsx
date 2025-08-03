@@ -1,5 +1,6 @@
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { toast } from "sonner";
+import z from "zod";
 import { useShallow } from "zustand/shallow";
 import { Button } from "~/components/ui/button";
 import { useFlowValidator } from "~/hooks/use-flow-validator";
@@ -16,24 +17,24 @@ export const SaveFlowButton = () => {
   );
   const insert = api.workflow.insertFlow.useMutation();
 
-  const parsed = workflowSchema.safeParse(saveWorkflow());
-
-  if (!parsed.success) {
-    console.error(parsed.error);
-  }
-
-  if (parsed.success) {
-    console.log(parsed.data, "<--- parsed workflow");
-  }
-
   const [isValidating, validateFlow] = useFlowValidator((isValid) => {
     if (isValid) {
       const workflow = saveWorkflow();
-      console.log(workflow, "<----- the workflow");
-      toast.success("Flow is valid", {
-        description: "You can now proceed to the next step",
-        dismissible: true,
-      });
+      const parsed = workflowSchema.safeParse(workflow);
+
+      if (!parsed.success && !parsed.data) {
+        toast.error(z.prettifyError(parsed.error));
+        throw new Error("unable to parse workflow");
+      }
+
+      try {
+        insert.mutate(parsed.data);
+      } catch (err) {
+        toast.error("error", {
+          description: JSON.stringify(err),
+        });
+        throw new Error("error inserting flow");
+      }
     } else
       toast.error("Flow is invalid", {
         description:

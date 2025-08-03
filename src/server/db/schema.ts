@@ -59,7 +59,7 @@ export const workflowRelations = relations(workflows, ({ many }) => ({
 // Node type
 export const workflowActions = createTable("workflow_actions", (d) => ({
   id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
-  name: d.varchar({ length: 256 }), // should match up to react flow node "type"
+  name: d.varchar({ length: 256 }).notNull(), // should match up to react flow node "type"
   description: d.varchar({ length: 1000 }),
   inputs: d.jsonb().$type<ActionData>().notNull(),
   outputs: d.jsonb().$type<ActionData>(),
@@ -79,7 +79,15 @@ export const workflowSteps = createTable("workflow_steps", (d) => ({
     .notNull(),
   reactNodeId: d.varchar({ length: 64 }).notNull(),
   config: d.jsonb().$type<ActionData>().notNull(),
-  outputValues: d.jsonb().$type<ActionData>().notNull(),
+  outputValues: d.jsonb().$type<ActionData>(),
+  // react flow node data for positioning on canvas
+  positionX: d.integer().notNull(),
+  positionY: d.integer().notNull(),
+  width: d.integer().notNull(),
+  height: d.integer().notNull(),
+  selected: d.boolean().default(false),
+  dragging: d.boolean().default(false),
+  deletable: d.boolean().default(true),
 }));
 
 export const workflowStepRelations = relations(workflowSteps, ({ one }) => ({
@@ -88,7 +96,7 @@ export const workflowStepRelations = relations(workflowSteps, ({ one }) => ({
     references: [workflows.id],
   }),
   action: one(workflowActions, {
-    fields: [workflowSteps.workflowId],
+    fields: [workflowSteps.workflowActionId],
     references: [workflowActions.id],
   }),
 }));
@@ -127,9 +135,13 @@ export const workflowStepEdgeRelations = relations(
   })
 );
 
-// TBC
 export const workflowInstances = createTable("workflow_instances", (d) => ({
   id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
+  workflowId: d.integer("workflow_id").references(() => workflows.id),
+  status: d.varchar({ length: 32 }).notNull(),
+  startedAt: d.timestamp({ withTimezone: true }),
+  finishedAt: d.timestamp({ withTimezone: true }),
+  error: d.varchar({ length: 2000 }),
 }));
 
 export const workflowStepInstances = createTable(

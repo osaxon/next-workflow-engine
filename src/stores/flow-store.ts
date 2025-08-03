@@ -89,6 +89,7 @@ interface Actions {
       nodes: Node[];
       edges: Edge[];
     };
+    initialiseWorkflow: () => WorkflowSchema;
     setWorkflow: (workflow: IFlowState["workflow"]) => void;
     nodes: {
       onNodesChange: (changes: NodeChange[]) => void;
@@ -165,27 +166,33 @@ const TAGS = [
   },
 ] satisfies Tag[];
 
-export const useFlowStore = create<IFlowState>()((set, get) => ({
-  tags: TAGS,
-  workflow: {
-    id: nanoid(),
-    name: "",
-    edges: [],
-    nodes: [],
-    sidebar: {
-      active: "none",
-      panels: {
-        nodeProperties: {
-          selectedNode: null,
-        },
+const initFlow = {
+  id: nanoid(),
+  name: "placeholder",
+  edges: [] as WorkflowSchema["edges"],
+  nodes: [] as WorkflowSchema["nodes"],
+  sidebar: {
+    active: "none",
+    panels: {
+      nodeProperties: {
+        selectedNode: null,
       },
     },
-  },
+  } as WorkflowSchema["sidebar"],
+};
+
+export const useFlowStore = create<IFlowState>()((set, get) => ({
+  tags: TAGS,
+  workflow: initFlow,
   actions: {
     saveWorkflow: () => {
       const { workflow } = get();
       set({ workflow });
       return workflow;
+    },
+    initialiseWorkflow: () => {
+      set({ workflow: initFlow });
+      return initFlow;
     },
     setWorkflow: (workflow: IFlowState["workflow"]) => {
       set((state) => ({

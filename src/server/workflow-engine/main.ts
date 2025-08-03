@@ -1,6 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db";
-import { workflows, type WorkflowActionInput } from "../db/schema";
+import {
+  workflowInstances,
+  workflows,
+  type ActionData,
+  type WorkflowActionInput,
+} from "../db/schema";
 import { ActionFactory, type WorkflowActions } from "./actions/action-factory";
 
 interface IWorkflowEngine {
@@ -9,6 +14,17 @@ interface IWorkflowEngine {
 
 export class WorkflowEngine implements IWorkflowEngine {
   async run(workflowId: number) {
+    // 1. create workflow instance
+    const [workflowInstance] = await db
+      .insert(workflowInstances)
+      .values({
+        workflowId,
+        status: "STARTED",
+        startedAt: new Date(),
+      })
+      .returning({ id: workflowInstances.id });
+
+    // 2. load workflow definition
     const workflow = await db.query.workflows.findFirst({
       where: (workflows, { eq }) => eq(workflows.id, workflowId),
       with: {
@@ -24,7 +40,7 @@ export class WorkflowEngine implements IWorkflowEngine {
     const stepMap = new Map(workflow?.steps.map((step) => [step.id, step]));
     const edges = workflow?.edges;
 
-    if (!workflow || !edges) return null;
+    if (!workflow || !edges || !workflowInstance) return null;
 
     const executionOrder = topologicalSort(workflow.steps, edges);
 
@@ -35,19 +51,20 @@ export class WorkflowEngine implements IWorkflowEngine {
 
       if (!step) return null;
 
-      const resolvedInputs = resolveStepInputs(step.config, stepOutputs);
+      // TODO implement way of using output of prev step as input to next
+      // const resolvedInputs = resolveStepInputs(step.config, stepOutputs);
 
-      step.config.map((input) => ({
-        ...input,
-        value: resolvedInputs[input.name],
-      }));
+      // step.config.map((input) => ({
+      //   ...input,
+      //   value: resolvedInputs[input.name],
+      // }));
 
       const action = ActionFactory.InitAction(
         step.action.name as WorkflowActions,
         step
       );
 
-      const output = await action?.execute();
+      const output = await action?.Execute(workflowInstance?.id);
 
       stepOutputs[stepId] = output;
     }
@@ -56,29 +73,29 @@ export class WorkflowEngine implements IWorkflowEngine {
   }
 }
 
-function resolveStepInputs(
-  config: WorkflowActionInput[],
-  stepOutputs: Record<number, any>
-): Record<string, any> {
-  const resolved: Record<string, any> = {};
+// function resolveStepInputs(
+//   config: ActionData,
+//   stepOutputs: ActionData
+// ): ActionData {
+//   const resolved: ActionData = {};
 
-  for (const input of config) {
-    switch (input.type) {
-      case "string":
-      case "number":
-      case "boolean":
-      case "array":
-        // For static values, assume you have a .value property or similar
-        resolved[input.name] = (input as any).value;
-        break;
-      case "stepOutput":
-        resolved[input.name] = stepOutputs[input.stepId]?.[input.outputKey];
-        break;
-    }
-  }
+//   for (const input of config) {
+//     switch (input.type) {
+//       case "string":
+//       case "number":
+//       case "boolean":
+//       case "array":
+//         // For static values, assume you have a .value property or similar
+//         resolved[input.name] = (input as any).value;
+//         break;
+//       case "stepOutput":
+//         resolved[input.name] = stepOutputs[input.stepId]?.[input.outputKey];
+//         break;
+//     }
+//   }
 
-  return resolved;
-}
+//   return resolved;
+// }
 
 function topologicalSort(
   steps: { id: number }[],

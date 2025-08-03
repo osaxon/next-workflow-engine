@@ -30,9 +30,9 @@ export class WaitAction implements IWorkflowAction<WaitActionStep["config"]> {
     this.duration = waitConfig.duration;
   }
 
-  async execute() {
+  async Execute() {
     const workflowStepInstanceData: WorkflowStepInstance = {
-      inputValues: JSON.stringify({ duration: this.duration }),
+      inputValues: JSON.stringify(this.workflowStep.getConfig()),
       workflowInstanceId: 1,
       workflowActionId: 1,
       status: "STARTED",
@@ -48,11 +48,21 @@ export class WaitAction implements IWorkflowAction<WaitActionStep["config"]> {
       throw new Error("Error creating step instance");
     }
 
-    await setTimeout(this.duration);
+    try {
+      await setTimeout(this.duration);
 
-    await db
-      .update(workflowStepInstances)
-      .set({ status: "COMPLETE", finishedAt: new Date() })
-      .where(eq(workflowStepInstances.id, stepInstance?.stepInstanceId));
+      await db
+        .update(workflowStepInstances)
+        .set({ status: "COMPLETE", finishedAt: new Date() })
+        .where(eq(workflowStepInstances.id, stepInstance.stepInstanceId));
+
+      return { duration: this.duration };
+    } catch (err) {
+      await db
+        .update(workflowStepInstances)
+        .set({ status: "FAILED", error: String(err), finishedAt: new Date() })
+        .where(eq(workflowStepInstances.id, stepInstance.stepInstanceId));
+      throw err;
+    }
   }
 }

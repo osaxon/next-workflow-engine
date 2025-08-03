@@ -1,14 +1,13 @@
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-import { Key } from "lucide-react";
-import { z, ZodObject } from "zod";
+import { eq, type InferInsertModel } from "drizzle-orm";
+import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import {
+  workflowActions,
   workflows,
   workflowStepEdges,
   workflowSteps,
 } from "~/server/db/schema";
-import { WorkflowEngine } from "~/server/workflow-engine/main";
 import { getWorkflow } from "~/services/get-workflow";
 import { workflowSchema } from "~/stores/flow-store";
 
@@ -31,33 +30,38 @@ export const workflowRouter = createTRPCRouter({
           .returning({ id: workflows.id });
 
         if (!workflow) {
+          console.error("error creating workflow");
           tx.rollback();
           return;
         }
 
         // 2. Insert steps and build nodeId -> stepId map
         const stepIdMap: Record<string, number> = {};
-        for (const node of input.nodes.filter(
-          (n) => n.type !== "start" && n.type !== "end"
-        )) {
-          const config = Object.entries(node.data).map(([key, val]) => ({
-            name: key,
-            type:
-              typeof val === "string"
-                ? ("string" as const)
-                : typeof val === "boolean"
-                ? ("boolean" as const)
-                : ("number" as const),
-            value: val,
-          }));
+
+        for (const node of input.nodes) {
+          const workflowActionDb = await tx.query.workflowActions.findFirst({
+            where: eq(workflowActions.name, node.type),
+          });
+
+          if (!workflowActionDb) {
+            tx.rollback();
+            console.log(node.type);
+            console.error("error finding action");
+            throw new Error("unable to find action");
+          }
 
           const stepData: InferInsertModel<typeof workflowSteps> = {
             workflowId: workflow.id,
-            config: config,
-            outputValues: config[0]!,
+            config: node.data,
             reactNodeId: node.id,
-            workflowActionId: 1,
+            workflowActionId: workflowActionDb?.id,
+            outputValues: node.data,
+            positionX: node.position.x,
+            positionY: node.position.y,
+            width: 300,
+            height: 150,
           };
+
           const [step] = await tx
             .insert(workflowSteps)
             .values(stepData)
@@ -89,8 +93,12 @@ export const workflowRouter = createTRPCRouter({
       });
     }),
   getWorkflow: publicProcedure
-    .input(z.object({ workflowId: z.string() }))
+    .input(z.object({ workflowId: z.number() }))
     .query(async ({ input }) => {
-      return await getWorkflow(input.workflowId);
+      const workflow = await getWorkflow(input.workflowId);
+
+      console.log(input.workflowId, "workflow");
+
+      return workflow;
     }),
 });

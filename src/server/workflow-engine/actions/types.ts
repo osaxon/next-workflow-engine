@@ -5,5 +5,5 @@ import type { WorkflowStep } from "../workflow-step/workflow-step";
 export interface IWorkflowAction<TConfig extends Config> {
   schema: ZodType;
   workflowStep: WorkflowStep<TConfig>;
-  execute: () => Promise<void>;
+  Execute: (workflowInstanceId: number) => Promise<TConfig>;
 }

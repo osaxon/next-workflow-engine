@@ -8,8 +8,10 @@ export default async function Workflow({
 }) {
   const { id } = await params;
   const workflow = await api.workflow.getWorkflow({
-    workflowId: id,
+    workflowId: Number(id),
   });
+
+  if (!workflow) return <p>no workflow found</p>;
 
   return <FlowBuilderPage workflow={workflow} />;
 }
