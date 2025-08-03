@@ -1,0 +1,106 @@
+{
+  "id": "1",
+  "name": "Initial Workflow",
+  "edges": [
+    {
+      "source": "rFM8ixvItA-i-bXblxZ_M",
+      "target": "iERwiGUX4Ydfu2zckM4Uj",
+      "id": "SpCCypcrvIiLEpqZgvtsM",
+      "type": "deletable"
+    },
+    {
+      "source": "iERwiGUX4Ydfu2zckM4Uj",
+      "target": "H64QKXEljq3F8-uueIv97",
+      "id": "rP8GlLTJ4NNP_Q7qFIL_q",
+      "type": "deletable"
+    },
+    {
+      "source": "H64QKXEljq3F8-uueIv97",
+      "target": "DtJ7scXmGEA101ommJOKc",
+      "id": "AetnQwMQFC2bkJ6NBGJNR",
+      "type": "deletable"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "rFM8ixvItA-i-bXblxZ_M",
+      "type": "start",
+      "position": {
+        "x": 96,
+        "y": 192
+      },
+      "deletable": false,
+      "data": {
+        "label": "Start",
+        "deletable": false
+      },
+      "measured": {
+        "width": 98,
+        "height": 42
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "DtJ7scXmGEA101ommJOKc",
+      "type": "end",
+      "position": {
+        "x": 1216,
+        "y": 241
+      },
+      "deletable": false,
+      "data": {
+        "label": "End",
+        "deletable": true
+      },
+      "measured": {
+        "width": 90,
+        "height": 42
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "iERwiGUX4Ydfu2zckM4Uj",
+      "type": "wait",
+      "data": {
+        "duration": 500
+      },
+      "position": {
+        "x": 416,
+        "y": -32
+      },
+      "selected": false,
+      "measured": {
+        "width": 288,
+        "height": 145
+      },
+      "dragging": false
+    },
+    {
+      "id": "H64QKXEljq3F8-uueIv97",
+      "type": "wait",
+      "data": {
+        "duration": 500
+      },
+      "position": {
+        "x": 800,
+        "y": -16
+      },
+      "selected": false,
+      "measured": {
+        "width": 288,
+        "height": 145
+      },
+      "dragging": false
+    }
+  ],
+  "sidebar": {
+    "active": "available-nodes",
+    "panels": {
+      "nodeProperties": {
+        "selectedNode": null
+      }
+    }
+  }
+}
