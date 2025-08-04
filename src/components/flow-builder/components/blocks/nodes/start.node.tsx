@@ -1,10 +1,14 @@
+import { Icon } from "@iconify/react";
 import { type Node, type NodeProps, Position } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { memo, useMemo, useState } from "react";
-import { BaseNodeData, BuilderNode, RegisterNodeMetadata } from "../types";
-import { getNodeDetail } from "../utils";
 import CustomHandle from "../../handles/custom-handler";
-import { Icon } from "@iconify/react";
+import {
+  type BaseNodeData,
+  BuilderNode,
+  type RegisterNodeMetadata,
+} from "../types";
+import { getNodeDetail } from "../utils";
 
 export interface StartNodeData extends BaseNodeData {
   label?: string;
@@ -49,9 +53,10 @@ export const metadata: RegisterNodeMetadata<StartNodeData> = {
     inputs: 0,
     outputs: 1,
   },
-  available: false,
+  available: true,
   defaultData: {
     label: "Start",
     deletable: false,
   },
+  serverActionId: 3,
 };

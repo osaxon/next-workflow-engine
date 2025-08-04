@@ -1,4 +1,4 @@
 import type z from "zod";
-import type { waitActionSchema } from "./schemas";
+import type { waitStepConfig } from "./schemas";
 
-export type WaitActionStep = z.infer<typeof waitActionSchema>;
+export type WaitStepConfig = z.infer<typeof waitStepConfig>;

@@ -20,11 +20,12 @@ export const SaveFlowButton = () => {
   const [isValidating, validateFlow] = useFlowValidator((isValid) => {
     if (isValid) {
       const workflow = saveWorkflow();
+      console.log(workflow, "<----- save workflow data");
       const parsed = workflowSchema.safeParse(workflow);
 
       if (!parsed.success && !parsed.data) {
-        toast.error(z.prettifyError(parsed.error));
-        throw new Error("unable to parse workflow");
+        console.log(z.prettifyError(parsed.error));
+        return;
       }
 
       try {

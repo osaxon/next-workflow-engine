@@ -1,8 +1,5 @@
-import type { Node } from "@xyflow/react";
-import { TruckElectricIcon } from "lucide-react";
 import z from "zod";
 import { db } from "~/server/db";
-import { workflows } from "~/server/db/schema";
 import { workflowSchema } from "~/stores/flow-store";
 
 export type WorkflowSchema = z.infer<typeof workflowSchema>;
@@ -47,7 +44,6 @@ function mapToReactFlow(workflow: WorkflowWithEdgesAndSteps) {
   }));
 
   const nodes: WorkflowSchema["nodes"] = workflow.steps.map((step) => {
-    console.log(step.action, "<------ step action");
     return {
       id: step.id.toString(),
       type: step.action.name,

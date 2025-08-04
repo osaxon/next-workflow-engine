@@ -14,6 +14,7 @@ interface IWorkflowEngine {
 
 export class WorkflowEngine implements IWorkflowEngine {
   async run(workflowId: number) {
+    console.log("RUNNING WORKFLOW");
     // 1. create workflow instance
     const [workflowInstance] = await db
       .insert(workflowInstances)
@@ -37,12 +38,19 @@ export class WorkflowEngine implements IWorkflowEngine {
       },
     });
 
+    console.log("WORKFLOW LOADED: ", workflow);
+
     const stepMap = new Map(workflow?.steps.map((step) => [step.id, step]));
+
+    console.log("STEPS:", stepMap);
+
     const edges = workflow?.edges;
 
     if (!workflow || !edges || !workflowInstance) return null;
 
     const executionOrder = topologicalSort(workflow.steps, edges);
+
+    console.log("EXECUTION ORDER:", executionOrder);
 
     const stepOutputs: Record<number, unknown> = {};
 
@@ -59,6 +67,8 @@ export class WorkflowEngine implements IWorkflowEngine {
       //   value: resolvedInputs[input.name],
       // }));
 
+      console.log("LOADING ACTION: ", step.action.name);
+
       const action = ActionFactory.InitAction(
         step.action.name as WorkflowActions,
         step
@@ -67,6 +77,7 @@ export class WorkflowEngine implements IWorkflowEngine {
       const output = await action?.Execute(workflowInstance?.id);
 
       stepOutputs[stepId] = output;
+      console.log("OUTPUTS", stepOutputs);
     }
 
     return null;

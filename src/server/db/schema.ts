@@ -24,7 +24,7 @@ export type WorkflowActionInput =
   | { name: string; type: "stepOutput"; stepId: number; outputKey: string }
   | { name: string; type: "workflowInput"; inputKey: string };
 
-export type ActionData = Record<string, any>;
+export type ActionData = Record<string, unknown>;
 
 type WorkflowStepConfig =
   | { name: string; type: "string"; value: string }

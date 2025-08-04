@@ -46,7 +46,7 @@ export const workflowSchema = z.object({
         x: z.number(),
         y: z.number(),
       }),
-      dragging: z.boolean(),
+      dragging: z.boolean().optional(),
     })
   ),
   sidebar: z.object({
@@ -268,6 +268,7 @@ export const useFlowStore = create<IFlowState>()((set, get) => ({
     },
     nodes: {
       onNodesChange: (changes) => {
+        console.log("on nodes change", changes);
         set((state) =>
           produce(state, (draft) => {
             const updatedNodes = applyNodeChanges(

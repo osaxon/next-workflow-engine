@@ -1,10 +1,14 @@
+import { Icon } from "@iconify/react";
 import { type Node, type NodeProps, Position } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { memo, useMemo, useState } from "react";
-import { BaseNodeData, BuilderNode, RegisterNodeMetadata } from "../types";
-import { getNodeDetail } from "../utils";
 import CustomHandle from "../../handles/custom-handler";
-import { Icon } from "@iconify/react";
+import {
+  type BaseNodeData,
+  BuilderNode,
+  type RegisterNodeMetadata,
+} from "../types";
+import { getNodeDetail } from "../utils";
 
 export interface EndNodeData extends BaseNodeData {
   label?: string;
@@ -44,15 +48,16 @@ export const metadata: RegisterNodeMetadata<EndNodeData> = {
   detail: {
     icon: "solar:stop-bold",
     title: "End",
-    description: "End the chatbot flow",
+    description: "End the flow",
   },
   connection: {
     inputs: 1,
     outputs: 0,
   },
-  available: false,
+  available: true,
   defaultData: {
     label: "End",
     deletable: true,
   },
+  serverActionId: 4,
 };

@@ -32,7 +32,7 @@ export const workflowRouter = createTRPCRouter({
         if (!workflow) {
           console.error("error creating workflow");
           tx.rollback();
-          return;
+          throw new Error("error creating workflow");
         }
 
         // 2. Insert steps and build nodeId -> stepId map
@@ -68,8 +68,10 @@ export const workflowRouter = createTRPCRouter({
             .returning({ id: workflowSteps.id });
 
           if (!step) {
+            console.error("error creating step");
             tx.rollback();
-            return;
+
+            throw new Error("error creating step");
           }
 
           stepIdMap[node.id] = step?.id;
@@ -96,9 +98,6 @@ export const workflowRouter = createTRPCRouter({
     .input(z.object({ workflowId: z.number() }))
     .query(async ({ input }) => {
       const workflow = await getWorkflow(input.workflowId);
-
-      console.log(input.workflowId, "workflow");
-
       return workflow;
     }),
 });

@@ -1,23 +1,19 @@
-import { setTimeout } from "node:timers/promises";
 import { z } from "zod";
 import type { TWorkflowStep } from "../../workflow-step/types";
 import { WorkflowStep } from "../../workflow-step/workflow-step";
-import type { IWorkflowAction } from "../types";
-import { waitStepConfig } from "./schemas";
-import type { WaitStepConfig } from "./types";
+import { type IWorkflowAction } from "../types";
+import { endActionConfigSchema } from "./schemas";
+import type { EndStepConfig } from "./types";
 import { db } from "~/server/db";
 import {
-  workflowActions,
   workflowStepInstances,
   type WorkflowStepInstance,
 } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
 
-export class WaitAction implements IWorkflowAction<WaitStepConfig> {
-  schema = waitStepConfig;
-  name = "wait";
-  duration: number;
-  workflowStep: WorkflowStep<WaitStepConfig>;
+export class EndAction implements IWorkflowAction<EndStepConfig> {
+  name = "end";
+  schema = endActionConfigSchema;
+  workflowStep: WorkflowStep<EndStepConfig>;
 
   constructor(step: TWorkflowStep) {
     const parsed = this.schema.safeParse(step.config);
@@ -27,9 +23,6 @@ export class WaitAction implements IWorkflowAction<WaitStepConfig> {
     }
 
     this.workflowStep = new WorkflowStep(step);
-    const waitConfig = this.workflowStep.getConfig();
-
-    this.duration = waitConfig.duration;
   }
 
   async Execute(workflowInstanceId: number) {
@@ -56,21 +49,6 @@ export class WaitAction implements IWorkflowAction<WaitStepConfig> {
       throw new Error("Error creating step instance");
     }
 
-    try {
-      await setTimeout(this.duration);
-
-      await db
-        .update(workflowStepInstances)
-        .set({ status: "COMPLETE", finishedAt: new Date() })
-        .where(eq(workflowStepInstances.id, stepInstance.stepInstanceId));
-
-      return { duration: this.duration };
-    } catch (err) {
-      await db
-        .update(workflowStepInstances)
-        .set({ status: "FAILED", error: String(err), finishedAt: new Date() })
-        .where(eq(workflowStepInstances.id, stepInstance.stepInstanceId));
-      throw err;
-    }
+    return this.workflowStep.getConfig();
   }
 }
