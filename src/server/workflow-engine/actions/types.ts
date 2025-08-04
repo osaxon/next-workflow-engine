@@ -5,5 +5,11 @@ import type { WorkflowStep } from "../workflow-step/workflow-step";
 export interface IWorkflowAction<TConfig extends Config> {
   schema: ZodType;
   workflowStep: WorkflowStep<TConfig>;
-  Execute: (workflowInstanceId: number) => Promise<TConfig>;
+  Execute: () => Promise<StepResult<TConfig>>;
 }
+
+export type StepResult<TData extends Config> = {
+  result: "COMPLETE" | "FAILED";
+  inputData: TData;
+  error?: string;
+};

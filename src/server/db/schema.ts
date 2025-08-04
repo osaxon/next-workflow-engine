@@ -144,6 +144,17 @@ export const workflowInstances = createTable("workflow_instances", (d) => ({
   error: d.varchar({ length: 2000 }),
 }));
 
+export const workflowInstanceRelations = relations(
+  workflowInstances,
+  ({ one, many }) => ({
+    workflow: one(workflows, {
+      fields: [workflowInstances.workflowId],
+      references: [workflows.id],
+    }),
+    stepInstances: many(workflowStepInstances),
+  })
+);
+
 export const workflowStepInstances = createTable(
   "workflow_step_instances",
   (d) => ({
@@ -156,6 +167,16 @@ export const workflowStepInstances = createTable(
     startedAt: d.timestamp({ withTimezone: true }),
     finishedAt: d.timestamp({ withTimezone: true }),
     error: d.varchar({ length: 2000 }), // Optional error message/log
+  })
+);
+
+export const workflowStepInstanceRelations = relations(
+  workflowStepInstances,
+  ({ one }) => ({
+    workflowInstance: one(workflowInstances, {
+      fields: [workflowStepInstances.workflowInstanceId],
+      references: [workflowInstances.id],
+    }),
   })
 );
 

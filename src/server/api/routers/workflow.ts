@@ -2,20 +2,25 @@ import { eq, type InferInsertModel } from "drizzle-orm";
 import { z } from "zod";
 
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { workflowInstancesQuery } from "~/server/db/prepared-statements";
 import {
   workflowActions,
   workflows,
   workflowStepEdges,
   workflowSteps,
 } from "~/server/db/schema";
-import { getWorkflow } from "~/services/get-workflow";
+import {
+  getWorkflowByIdWithEdgesAndSteps,
+  getWorkflowForClient,
+  getWorkflowInstances,
+} from "~/services/get-workflow";
 import { workflowSchema } from "~/stores/flow-store";
 
 export const workflowRouter = createTRPCRouter({
   startFlow: publicProcedure
     .input(z.object({ workflowId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await ctx.workflowEngine.run(input.workflowId);
+      await ctx.workflowEngine.Run(input.workflowId);
     }),
   insertFlow: publicProcedure
     .input(workflowSchema)
@@ -94,10 +99,23 @@ export const workflowRouter = createTRPCRouter({
         }
       });
     }),
+  getEditableFlow: publicProcedure
+    .input(z.object({ workflowId: z.number() }))
+    .query(async ({ input }) => {
+      const workflow = await getWorkflowForClient(input.workflowId);
+      return workflow;
+    }),
   getWorkflow: publicProcedure
     .input(z.object({ workflowId: z.number() }))
     .query(async ({ input }) => {
-      const workflow = await getWorkflow(input.workflowId);
+      const workflow = await getWorkflowByIdWithEdgesAndSteps(input.workflowId);
+
       return workflow;
+    }),
+  getWorkflowInstances: publicProcedure
+    .input(z.object({ workflowId: z.number() }))
+    .query(async ({ input }) => {
+      const instances = await getWorkflowInstances(input.workflowId);
+      return instances ?? [];
     }),
 });

@@ -1,14 +1,8 @@
-import z from "zod";
 import type { TWorkflowStep } from "../../workflow-step/types";
 import { WorkflowStep } from "../../workflow-step/workflow-step";
-import { type IWorkflowAction } from "../types";
+import { type IWorkflowAction, type StepResult } from "../types";
 import { startActionConfigSchema } from "./schemas";
 import type { StartStepConfig } from "./types";
-import { db } from "~/server/db";
-import {
-  workflowStepInstances,
-  type WorkflowStepInstance,
-} from "~/server/db/schema";
 
 export class StartAction implements IWorkflowAction<StartStepConfig> {
   name = "start";
@@ -24,30 +18,10 @@ export class StartAction implements IWorkflowAction<StartStepConfig> {
     this.workflowStep = new WorkflowStep(step);
   }
 
-  async Execute(workflowInstanceId: number) {
-    const action = await db.query.workflowActions.findFirst({
-      where: (workflowActions, { eq }) => eq(workflowActions.name, this.name),
-    });
-
-    if (!action) throw new Error("couldn't find action in db");
-
-    const workflowStepInstanceData: WorkflowStepInstance = {
-      inputValues: JSON.stringify(this.workflowStep.getConfig()),
-      workflowInstanceId: workflowInstanceId,
-      workflowActionId: action?.id,
-      status: "STARTED",
-      startedAt: new Date(),
+  async Execute(): Promise<StepResult<StartStepConfig>> {
+    return {
+      result: "COMPLETE",
+      inputData: this.workflowStep.getConfig(),
     };
-
-    const [stepInstance] = await db
-      .insert(workflowStepInstances)
-      .values(workflowStepInstanceData)
-      .returning({ stepInstanceId: workflowStepInstances.id });
-
-    if (!stepInstance) {
-      throw new Error("Error creating step instance");
-    }
-
-    return this.workflowStep.getConfig();
   }
 }

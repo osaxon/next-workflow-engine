@@ -1,17 +1,14 @@
-import { FlowBuilderPage } from "~/app/_components/flow-builder";
 import { api } from "~/trpc/server";
 
-export default async function Workflow({
+export default async function WorkflowPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const workflow = await api.workflow.getWorkflow({
+  const instances = await api.workflow.getWorkflowInstances({
     workflowId: Number(id),
   });
 
-  if (!workflow) return <p>no workflow found</p>;
-
-  return <FlowBuilderPage workflow={workflow} />;
+  return <pre>{JSON.stringify(instances, null, 2)}</pre>;
 }

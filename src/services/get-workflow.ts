@@ -1,34 +1,26 @@
+"use server";
+
 import z from "zod";
 import { db } from "~/server/db";
+import {
+  workflowFullQuery,
+  workflowInstancesQuery,
+} from "~/server/db/prepared-statements";
 import { workflowSchema } from "~/stores/flow-store";
 
 export type WorkflowSchema = z.infer<typeof workflowSchema>;
 
-export const getWorkflow = async (
+export const getWorkflowForClient = async (
   id: number
 ): Promise<WorkflowSchema | null> => {
-  // const dummyworkflow = await import("../../data/workflow.json").then(
-  //   (data) => data.default
-  // );
-
-  // const parsed = workflowSchema.safeParse(dummyworkflow);
-
-  // if (!parsed.success) {
-  //   return null;
-  // }
-
-  // return parsed.data;
-
   const workflow = await getWorkflowByIdWithEdgesAndSteps(id);
 
-  console.log(workflow, "<---- the workflow being passed");
-
-  const reactFlow = mapToReactFlow(workflow);
+  const reactFlow = mapWorkflowToReactFlow(workflow);
 
   return reactFlow;
 };
 
-function mapToReactFlow(workflow: WorkflowWithEdgesAndSteps) {
+function mapWorkflowToReactFlow(workflow: WorkflowWithEdgesAndSteps) {
   if (workflow === undefined) return null;
 
   const edges: {
@@ -79,33 +71,27 @@ function mapToReactFlow(workflow: WorkflowWithEdgesAndSteps) {
   return workflowSchema;
 }
 
-async function getWorkflowByIdWithEdgesAndSteps(id: number) {
-  return await db.query.workflows.findFirst({
-    where: (workflows, { eq }) => eq(workflows.id, id),
-    with: {
-      edges: {
-        with: {
-          sourceStep: {
-            with: {
-              action: true,
-            },
-          },
-          targetStep: {
-            with: {
-              action: true,
-            },
-          },
-        },
-      },
-      steps: {
-        with: {
-          action: true,
-        },
-      },
-    },
-  });
+export async function getWorkflowByIdWithEdgesAndSteps(id: number) {
+  const workflow = await workflowFullQuery.execute({ id });
+
+  if (!workflow) {
+    throw new Error("error fetching workflow");
+  }
+  return workflow;
 }
 
-type WorkflowWithEdgesAndSteps = Awaited<
+export async function getWorkflowInstances(id: number) {
+  const instances = await workflowInstancesQuery.execute({
+    id,
+  });
+
+  return instances;
+}
+
+export type WorkflowWithEdgesAndSteps = Awaited<
   Promise<ReturnType<typeof getWorkflowByIdWithEdgesAndSteps>>
+>;
+
+export type WorkflowInstances = Awaited<
+  Promise<ReturnType<typeof getWorkflowInstances>>
 >;

@@ -2,16 +2,9 @@ import { setTimeout } from "node:timers/promises";
 import { z } from "zod";
 import type { TWorkflowStep } from "../../workflow-step/types";
 import { WorkflowStep } from "../../workflow-step/workflow-step";
-import type { IWorkflowAction } from "../types";
+import type { IWorkflowAction, StepResult } from "../types";
 import { waitStepConfig } from "./schemas";
 import type { WaitStepConfig } from "./types";
-import { db } from "~/server/db";
-import {
-  workflowActions,
-  workflowStepInstances,
-  type WorkflowStepInstance,
-} from "~/server/db/schema";
-import { eq } from "drizzle-orm";
 
 export class WaitAction implements IWorkflowAction<WaitStepConfig> {
   schema = waitStepConfig;
@@ -32,45 +25,20 @@ export class WaitAction implements IWorkflowAction<WaitStepConfig> {
     this.duration = waitConfig.duration;
   }
 
-  async Execute(workflowInstanceId: number) {
-    const action = await db.query.workflowActions.findFirst({
-      where: (workflowActions, { eq }) => eq(workflowActions.name, this.name),
-    });
-
-    if (!action) throw new Error("couldn't find action in db");
-
-    const workflowStepInstanceData: WorkflowStepInstance = {
-      inputValues: JSON.stringify(this.workflowStep.getConfig()),
-      workflowInstanceId: workflowInstanceId,
-      workflowActionId: action?.id,
-      status: "STARTED",
-      startedAt: new Date(),
-    };
-
-    const [stepInstance] = await db
-      .insert(workflowStepInstances)
-      .values(workflowStepInstanceData)
-      .returning({ stepInstanceId: workflowStepInstances.id });
-
-    if (!stepInstance) {
-      throw new Error("Error creating step instance");
-    }
-
+  async Execute(): Promise<StepResult<WaitStepConfig>> {
     try {
       await setTimeout(this.duration);
 
-      await db
-        .update(workflowStepInstances)
-        .set({ status: "COMPLETE", finishedAt: new Date() })
-        .where(eq(workflowStepInstances.id, stepInstance.stepInstanceId));
-
-      return { duration: this.duration };
-    } catch (err) {
-      await db
-        .update(workflowStepInstances)
-        .set({ status: "FAILED", error: String(err), finishedAt: new Date() })
-        .where(eq(workflowStepInstances.id, stepInstance.stepInstanceId));
-      throw err;
+      return {
+        result: "COMPLETE",
+        inputData: this.workflowStep.getConfig(),
+      };
+    } catch (error) {
+      return {
+        result: "FAILED",
+        error: JSON.stringify(error),
+        inputData: this.workflowStep.getConfig(),
+      };
     }
   }
 }

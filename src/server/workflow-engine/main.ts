@@ -1,21 +1,85 @@
-import { eq } from "drizzle-orm";
+import { eq, type InferSelectModel } from "drizzle-orm";
 import { db } from "../db";
 import {
   workflowInstances,
-  workflows,
-  type ActionData,
-  type WorkflowActionInput,
+  workflowStepInstances,
+  type WorkflowStepInstance,
 } from "../db/schema";
 import { ActionFactory, type WorkflowActions } from "./actions/action-factory";
+import {
+  getWorkflowByIdWithEdgesAndSteps,
+  type WorkflowWithEdgesAndSteps,
+} from "~/services/get-workflow";
+
+type WorkflowResult = {
+  status: "SUCCESS" | "FAILED" | "RUNNING";
+};
+
+type StepOutputs = Record<number, unknown>;
+
+type StepMap = Map<number, WorkflowWithEdgesAndSteps["steps"][number]>;
 
 interface IWorkflowEngine {
-  run(workflowId: number): Promise<null>;
+  Run(workflowId: number): Promise<WorkflowResult>;
 }
 
 export class WorkflowEngine implements IWorkflowEngine {
-  async run(workflowId: number) {
+  async Run(workflowId: number) {
     console.log("RUNNING WORKFLOW");
-    // 1. create workflow instance
+    const workflowResult: WorkflowResult = {
+      status: "RUNNING",
+    };
+
+    let workflowInstance;
+    try {
+      const workflow = await getWorkflowByIdWithEdgesAndSteps(workflowId);
+
+      workflowInstance = await this.createWorkflowInstance(workflowId);
+
+      const stepMap = this.createStepMap(workflow.steps);
+      const executionOrder = topologicalSort(workflow.steps, workflow.edges);
+
+      const stepOutputs: StepOutputs = {};
+
+      for (const stepId of executionOrder) {
+        await this.executeStep(
+          stepId,
+          stepMap,
+          workflowInstance.id,
+          stepOutputs
+        );
+      }
+      await db
+        .update(workflowInstances)
+        .set({
+          status: "COMPLETE",
+          error: null,
+        })
+        .where(eq(workflowInstances.id, workflowInstance.id));
+
+      workflowResult.status = "SUCCESS";
+    } catch (error) {
+      // if the workflow instance was already created then set to failed
+      if (workflowInstance?.id) {
+        await db
+          .update(workflowInstances)
+          .set({
+            status: "FAILED",
+            error: JSON.stringify({ error }),
+          })
+          .where(eq(workflowInstances.id, workflowInstance.id));
+      }
+      workflowResult.status = "FAILED";
+    }
+
+    return workflowResult;
+  }
+
+  private createStepMap(steps: WorkflowWithEdgesAndSteps["steps"]) {
+    return new Map(steps.map((step) => [step.id, step]));
+  }
+
+  private async createWorkflowInstance(workflowId: number) {
     const [workflowInstance] = await db
       .insert(workflowInstances)
       .values({
@@ -25,92 +89,71 @@ export class WorkflowEngine implements IWorkflowEngine {
       })
       .returning({ id: workflowInstances.id });
 
-    // 2. load workflow definition
-    const workflow = await db.query.workflows.findFirst({
-      where: (workflows, { eq }) => eq(workflows.id, workflowId),
-      with: {
-        edges: true,
-        steps: {
-          with: {
-            action: true,
-          },
-        },
-      },
+    if (!workflowInstance)
+      throw new Error("Could not create workflow instance");
+
+    return workflowInstance;
+  }
+
+  private async executeStep(
+    stepId: number,
+    stepMap: StepMap,
+    workflowInstanceId: number,
+    stepOutputs: StepOutputs
+  ) {
+    const step = stepMap.get(stepId);
+    if (!step) throw new Error(`Step ${stepId} not found`);
+
+    const actionDef = await db.query.workflowActions.findFirst({
+      where: (workflowActions, { eq }) =>
+        eq(workflowActions.name, step.action.name),
     });
 
-    console.log("WORKFLOW LOADED: ", workflow);
+    if (!actionDef) throw new Error("couldn't find action in db");
 
-    const stepMap = new Map(workflow?.steps.map((step) => [step.id, step]));
+    const workflowStepInstanceData: WorkflowStepInstance = {
+      inputValues: JSON.stringify(step.config),
+      workflowInstanceId: workflowInstanceId,
+      workflowActionId: actionDef?.id,
+      status: "STARTED",
+      startedAt: new Date(),
+    };
 
-    console.log("STEPS:", stepMap);
+    const [stepInstance] = await db
+      .insert(workflowStepInstances)
+      .values(workflowStepInstanceData)
+      .returning({ stepInstanceId: workflowStepInstances.id });
 
-    const edges = workflow?.edges;
-
-    if (!workflow || !edges || !workflowInstance) return null;
-
-    const executionOrder = topologicalSort(workflow.steps, edges);
-
-    console.log("EXECUTION ORDER:", executionOrder);
-
-    const stepOutputs: Record<number, unknown> = {};
-
-    for (const stepId of executionOrder) {
-      const step = stepMap.get(stepId);
-
-      if (!step) return null;
-
-      // TODO implement way of using output of prev step as input to next
-      // const resolvedInputs = resolveStepInputs(step.config, stepOutputs);
-
-      // step.config.map((input) => ({
-      //   ...input,
-      //   value: resolvedInputs[input.name],
-      // }));
-
-      console.log("LOADING ACTION: ", step.action.name);
-
-      const action = ActionFactory.InitAction(
-        step.action.name as WorkflowActions,
-        step
-      );
-
-      const output = await action?.Execute(workflowInstance?.id);
-
-      stepOutputs[stepId] = output;
-      console.log("OUTPUTS", stepOutputs);
+    if (!stepInstance) {
+      throw new Error("Error creating step instance");
     }
 
-    return null;
+    const action = ActionFactory.InitAction(
+      step.action.name as WorkflowActions,
+      step
+    );
+
+    if (!action) {
+      throw new Error("Error initialising action");
+    }
+
+    const output = await action.Execute();
+
+    await db
+      .update(workflowStepInstances)
+      .set({
+        status: output?.result,
+        error: output?.error ?? null,
+        finishedAt: new Date(),
+      })
+      .where(eq(workflowStepInstances.id, stepInstance.stepInstanceId));
+    stepOutputs[stepId] = output;
   }
 }
 
-// function resolveStepInputs(
-//   config: ActionData,
-//   stepOutputs: ActionData
-// ): ActionData {
-//   const resolved: ActionData = {};
-
-//   for (const input of config) {
-//     switch (input.type) {
-//       case "string":
-//       case "number":
-//       case "boolean":
-//       case "array":
-//         // For static values, assume you have a .value property or similar
-//         resolved[input.name] = (input as any).value;
-//         break;
-//       case "stepOutput":
-//         resolved[input.name] = stepOutputs[input.stepId]?.[input.outputKey];
-//         break;
-//     }
-//   }
-
-//   return resolved;
-// }
-
 function topologicalSort(
-  steps: { id: number }[],
-  edges: { sourceStepId: number; targetStepId: number }[]
+  steps: WorkflowWithEdgesAndSteps["steps"],
+  edges: WorkflowWithEdgesAndSteps["edges"]
 ): number[] {
   const inDegree = new Map<number, number>();
   const adj = new Map<number, number[]>();
